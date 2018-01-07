@@ -12,6 +12,7 @@ class Parser
 
   def initialize(filename)
     @filename = filename
+    @addresses = []
   end
 
   def method_name
@@ -27,9 +28,28 @@ class Parser
   def parse_mailboxes
     mailboxes.each do |mailbox|
       parse_mailbox(mailbox).each do |message|
-        puts message.from
+        addresses(message).each do |address|
+          @addresses << address
+        end
       end
     end
+
+    @addresses
+  end
+
+  def addresses(mail)
+    Enumerator.new do |yielder|
+      yielder << mail[:envelope_from]
+      yielder << mail[:from].formatted
+      yielder << mail[:to].formatted
+      yielder << mail[:cc].formatted if mail[:cc]
+    end.map do |address_container|
+      next unless address_container
+
+      address_container.map do |address|
+        address
+      end
+    end.flatten.compact
   end
 
   def mailboxes
@@ -67,7 +87,9 @@ end
 
 def main
   ARGV.each do |arg|
-    Parser.parse(arg)
+    Parser.parse(arg).uniq.sort.each do |address|
+      puts address
+    end
   end
 end
 
