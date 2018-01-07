@@ -7,6 +7,16 @@ require 'zip'
 class Parser
   attr_accessor :filename
 
+  def self.dirname
+    File.join(File.dirname(__FILE__), 'tmp')
+  end
+
+  def self.reset
+    FileUtils.rmtree(dirname) if Dir.exists?(dirname)
+
+    FileUtils.mkdir_p(dirname)
+  end
+
   EMAIL_ADDRESS_PATTERN = %r{
     (
       \A
@@ -76,7 +86,7 @@ class Parser
   end
 
   def mailboxes
-    Dir.glob(File.join('tmp', '**', '*.mbox'))
+    Dir.glob(File.join(Parser.dirname, '**', '*.mbox'))
   end
 
   def parse_mailbox(mailbox)
@@ -97,11 +107,14 @@ class Parser
     Mail.new(message)
   end
 
+  def parse_mbox
+    FileUtils.cp(filename, Parser.dirname)
+  end
+
   def parse_zip
     Zip::File.open(filename) do |zip_file|
       zip_file.each do |f|
-        destination = File.join('tmp', f.name)
-        FileUtils.mkdir_p(File.dirname(destination))
+        destination = File.join(Parser.dirname, f.name)
         zip_file.extract(f, destination) unless File.exist?(destination)
       end
     end
@@ -109,6 +122,8 @@ class Parser
 end
 
 def main
+  Parser.reset
+
   # Extract addresses from each file in ARGV.
   addresses = ARGV.map do |arg|
     Parser.parse(arg)
@@ -118,7 +133,7 @@ def main
   end
 
   # Dump to csv.
-  filename = File.join('tmp', 'addresses.csv')
+  filename = File.join(Parser.dirname, 'addresses.csv')
   CSV.open(filename, 'w') do |csv|
     csv << %w(
       address
