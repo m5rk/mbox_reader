@@ -1,5 +1,6 @@
 #!/usr/bin/env ruby
 
+require 'csv'
 require 'mail'
 require 'zip'
 
@@ -104,10 +105,23 @@ class Parser
 end
 
 def main
-  ARGV.each do |arg|
-    Parser.parse(arg).uniq.sort.each do |address|
-      match = address.match(Parser::EMAIL_ADDRESS_PATTERN)
-      puts "#{address} -> Name: #{match[:name]} Email: #{match[:email]}"
+  filename = File.join('tmp', 'addresses.csv')
+  CSV.open(filename, 'w') do |csv|
+    csv << %w(
+      address
+      name
+      email
+    )
+
+    ARGV.each do |arg|
+      Parser.parse(arg).uniq.sort.each do |address|
+        match = address.match(Parser::EMAIL_ADDRESS_PATTERN)
+        csv << [
+          address,
+          match[:name],
+          match[:email]
+        ]
+      end
     end
   end
 end
