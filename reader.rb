@@ -6,6 +6,24 @@ require 'zip'
 class Parser
   attr_accessor :filename
 
+  EMAIL_ADDRESS_PATTERN = %r{
+    (
+      \A
+      (?<email>[^\s]+)
+      \z
+    )
+    |
+    (
+      \A
+      "?(?<name>.*?)?"?
+      \s+
+      \<
+      (?<email>.+)
+      \>
+      \z
+    )
+  }xi
+
   def self.parse(filename)
     new(filename).parse
   end
@@ -88,7 +106,8 @@ end
 def main
   ARGV.each do |arg|
     Parser.parse(arg).uniq.sort.each do |address|
-      puts address
+      match = address.match(Parser::EMAIL_ADDRESS_PATTERN)
+      puts "#{address} -> Name: #{match[:name]} Email: #{match[:email]}"
     end
   end
 end
