@@ -60,7 +60,7 @@ class Parser
     Enumerator.new do |yielder|
       yielder << mail[:envelope_from]
       yielder << mail[:from].formatted
-      yielder << mail[:to].formatted
+      yielder << mail[:to].formatted if mail[:to]
       yielder << mail[:cc].formatted if mail[:cc]
     end.map do |address_container|
       next unless address_container
@@ -69,6 +69,10 @@ class Parser
         address
       end
     end.flatten.compact
+  rescue StandardError => e
+    puts "Error parsing mail"
+
+    []
   end
 
   def mailboxes
@@ -105,6 +109,15 @@ class Parser
 end
 
 def main
+  # Extract addresses from each file in ARGV.
+  addresses = ARGV.map do |arg|
+    Parser.parse(arg)
+  end.flatten.compact.uniq.sort.map do |address|
+    match = address.match(Parser::EMAIL_ADDRESS_PATTERN) || {}
+    [address, match[:name], match[:email]]
+  end
+
+  # Dump to csv.
   filename = File.join('tmp', 'addresses.csv')
   CSV.open(filename, 'w') do |csv|
     csv << %w(
@@ -113,15 +126,8 @@ def main
       email
     )
 
-    ARGV.each do |arg|
-      Parser.parse(arg).uniq.sort.each do |address|
-        match = address.match(Parser::EMAIL_ADDRESS_PATTERN)
-        csv << [
-          address,
-          match[:name],
-          match[:email]
-        ]
-      end
+    addresses.each do |address|
+      csv << address
     end
   end
 end
