@@ -1,11 +1,16 @@
 #!/usr/bin/env ruby
 
+require 'benchmark'
 require 'csv'
 require 'mail'
 require 'zip'
 
 class Parser
-  attr_accessor :filename
+  attr_accessor \
+    :addresses,
+    :errors,
+    :filename,
+    :messages
 
   def self.dirname
     File.join(File.dirname(__FILE__), 'tmp')
@@ -36,14 +41,24 @@ class Parser
   }xi
 
   def self.parse(filename)
-    new(filename).parse
+    parser = new(filename)
+    elapsed = Benchmark.realtime { parser.parse }
+
+    puts %Q(
+Elapsed: #{elapsed.round(2)} seconds
+Addresses: #{parser.addresses.count}
+Messages: #{parser.messages}
+Errors: #{parser.errors}
+    ).strip
+
+    parser.addresses
   end
 
   def initialize(filename)
+    @addresses = []
+    @errors = 0
     @filename = filename
     @messages = 0
-    @errors = 0
-    @addresses = []
   end
 
   def method_name
@@ -63,22 +78,14 @@ class Parser
         if (index + 1) % 1000 == 0
           puts index + 1
         end
-        addresses(message).each do |address|
-          @addresses << address
+        iter_addresses(message).each do |address|
+          addresses << address
         end
       end
     end
-
-    puts %Q(
-Addresses: #{@addresses.count}
-Messages: #{@messages.count}
-Errors: #{@errors.count}
-)
-
-    @addresses
   end
 
-  def addresses(mail)
+  def iter_addresses(mail)
     Enumerator.new do |yielder|
       yielder << mail[:envelope_from]
       yielder << mail[:from].formatted
@@ -127,6 +134,7 @@ Errors: #{@errors.count}
     Zip::File.open(filename) do |zip_file|
       zip_file.each do |f|
         destination = File.join(Parser.dirname, f.name)
+        FileUtils.mkdir_p(File.dirname(destination))
         zip_file.extract(f, destination) unless File.exist?(destination)
       end
     end
