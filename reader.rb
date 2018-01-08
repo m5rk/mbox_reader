@@ -41,6 +41,8 @@ class Parser
 
   def initialize(filename)
     @filename = filename
+    @messages = 0
+    @errors = 0
     @addresses = []
   end
 
@@ -56,12 +58,22 @@ class Parser
 
   def parse_mailboxes
     mailboxes.each do |mailbox|
-      parse_mailbox(mailbox).each do |message|
+      parse_mailbox(mailbox).each_with_index do |message, index|
+        @messages += 1
+        if (index + 1) % 1000 == 0
+          puts index + 1
+        end
         addresses(message).each do |address|
           @addresses << address
         end
       end
     end
+
+    puts %Q(
+Addresses: #{@addresses.count}
+Messages: #{@messages.count}
+Errors: #{@errors.count}
+)
 
     @addresses
   end
@@ -80,7 +92,7 @@ class Parser
       end
     end.flatten.compact
   rescue StandardError => e
-    puts "Error parsing mail"
+    @errors += 1
 
     []
   end
@@ -142,7 +154,7 @@ def main
     )
 
     addresses.each do |address|
-      csv << address
+      csv << address.map { |item| item.strip if item }
     end
   end
 end
