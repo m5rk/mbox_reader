@@ -78,19 +78,24 @@ Errors: #{parser.errors}
         if (index + 1) % 1000 == 0
           puts index + 1
         end
-        iter_addresses(message).each do |address|
-          addresses << address
+        begin
+          date = message.date
+          iter_addresses(message).each do |address|
+            addresses << [address, date]
+          end
+        rescue StandardError => e
+          @errors += 1
         end
       end
     end
   end
 
-  def iter_addresses(mail)
+  def iter_addresses(message)
     Enumerator.new do |yielder|
-      yielder << mail[:envelope_from]
-      yielder << mail[:from].formatted
-      yielder << mail[:to].formatted if mail[:to]
-      yielder << mail[:cc].formatted if mail[:cc]
+      yielder << message[:envelope_from]
+      yielder << message[:from].formatted
+      yielder << message[:to].formatted if message[:to]
+      yielder << message[:cc].formatted if message[:cc]
     end.map do |address_container|
       next unless address_container
 
@@ -98,10 +103,6 @@ Errors: #{parser.errors}
         address
       end
     end.flatten.compact
-  rescue StandardError => e
-    @errors += 1
-
-    []
   end
 
   def mailboxes
@@ -145,11 +146,24 @@ def main
   Parser.reset
 
   # Extract addresses from each file in ARGV.
-  addresses = ARGV.map do |arg|
-    Parser.parse(arg)
-  end.flatten.compact.uniq.sort.map do |address|
+  addresses = []
+  ARGV.map do |arg|
+    addresses += Parser.parse(arg)
+  end
+
+  addresses = addresses.each_with_object({}) do |item, memo|
+    address, date = item
+    memo[address] ||= []
+    memo[address] << date
+  end.to_a.sort_by(&:first).map do |address, dates|
     match = address.match(Parser::EMAIL_ADDRESS_PATTERN) || {}
-    [address, match[:name], match[:email]]
+    most_recent_date = dates.compact.sort.last
+
+    if most_recent_date
+      most_recent_date = most_recent_date.to_date.to_s
+    end
+
+    [address, match[:name], match[:email], most_recent_date]
   end
 
   # Dump to csv.
@@ -159,6 +173,7 @@ def main
       address
       name
       email
+      most_recent_date
     )
 
     addresses.each do |address|
